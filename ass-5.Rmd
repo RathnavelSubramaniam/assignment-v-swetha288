@@ -1,0 +1,145 @@
+---
+title: "assignemnt "
+author: "swetha"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+We will now try to predict per capita crime rate in the Boston data set. 
+
+a) Try out some of the regression methods explored in this chapter,such as best subset 
+selection, the lasso, ridge regression, and PCR. Present and discuss results for the 
+approaches that you consider. 
+
+
+
+```{r}
+library(MASS)
+data("Boston")
+library(leaps)
+library(glmnet)
+library(pls)
+```
+```{r}
+boston=Boston
+```
+
+```{r}
+fit.lm=lm(crim~.,data = boston) 
+summary(fit.lm) 
+```
+In this model We zn,dis,rad,black,medv are having relationship with response variable. 
+
+```{r}
+best_subset=regsubsets(crim~.,data = boston,nvmax = 13) 
+best_subset.summary<-summary(best_subset) 
+best_subset.summary$adjr2 
+```
+```{r}
+par(mfrow = c(1, 3)) 
+```
+
+```{r}
+plot(best_subset.summary$cp, xlab = "Number of Variables", ylab = "C_p", type = "l") 
+points(which.min(best_subset.summary$cp), best_subset.summary$cp[which.min(best_subset.summary$cp)], col = "green", cex = 3, pch = 20) 
+```
+```{r}
+plot(best_subset.summary$bic, xlab = "Number of Variables", ylab = "BIC", type = "l") 
+points(which.min(best_subset.summary$bic), best_subset.summary$bic[which.min(best_subset.summary$bic)], col = "green", cex = 3, pch = 20) 
+
+```
+```{r}
+plot(best_subset.summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted R-squared", type = "l") 
+points(which.max(best_subset.summary$adjr2), best_subset.summary$adjr2[which.max(best_subset.summary$adjr2)], col = "green", cex = 3, pch = 20)
+```
+```{r}
+coef(best_subset,which.min(best_subset.summary$cp)) 
+```
+```{r}
+set.seed(2) 
+boston_matrix=model.matrix(crim~.,data = boston)[,-1]
+```
+
+
+```{r}
+ridge=cv.glmnet(boston_matrix,boston$crim,alpha=0) 
+bestlam<-ridge$lambda.min 
+bestlam
+```
+```{r}
+coef(ridge,s=bestlam)
+```
+```{r}
+
+set.seed(1) 
+lasso=cv.glmnet(boston_matrix,boston$crim,alpha=1) 
+bestlam<-lasso$lambda.min 
+bestlam 
+```
+```{r}
+coef(lasso,s=bestlam)
+```
+```{r}
+set.seed(2) 
+pcr=pcr(crim~.,data=boston,scale=TRUE,validation="CV") 
+pcr_summary<- summary(pcr) 
+```
+```{r}
+validationplot(pcr,val.type = "MSEP")
+```
+```{r}
+load_pcr<-pcr$loadings[,1:8] 
+load_pcr 
+```
+
+b) Propose a model (or set of models) that seem to perform well on this data set, and 
+justify your answer. Make sure that you areevaluating model performance using 
+validation set error, crossvalidation, or some other reasonable alternative, as 
+opposed to using training error. 
+
+```{r}
+train_boston = sample(nrow(boston), nrow(boston) * 0.70) 
+tr_boston = boston[train_boston, ] 
+te_boston = boston[-train_boston, ] 
+
+set.seed(3) 
+tr_boston_matrix = model.matrix(crim ~ ., data = tr_boston)[, -1] 
+te_boston_matrix = model.matrix(crim ~ ., data = te_boston)[, -1] 
+
+
+ridge = cv.glmnet(tr_boston_matrix, tr_boston$crim, alpha = 0) 
+
+
+bestlam = ridge$lambda.min 
+
+
+print(bestlam)
+
+```
+```{r}
+pred_ridge=predict(ridge,s=bestlam,newx = te_boston_matrix) 
+test_error=mean((te_boston$crim- pred_ridge)^2) 
+test_error 
+```
+```{r}
+rmse= sqrt(test_error) 
+(rmse/mean(te_boston$crim))*100 
+```
+
+```{r}
+lasso=cv.glmnet(tr_boston_matrix,tr_boston$crim,alpha=1) 
+bestlam=lasso$lambda.min 
+lasso_pred = predict(lasso, s = bestlam, newx = te_boston_matrix) 
+test_error = mean((te_boston$crim - lasso_pred)^2) 
+test_error 
+```
+```{r}
+rmse_lasso= sqrt(test_error) 
+(rmse_lasso/mean(te_boston$crim))*100
+```
+c) Does your chosen model involve all of the features in the data set? Why or why not?
+
+The chosen model does not involve all of the features in the data set, because some of the 
+predictors are not statistically significant to response.
+
+
